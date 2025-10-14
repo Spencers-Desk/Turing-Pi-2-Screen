@@ -1,0 +1,16 @@
+[Unit]
+Description=System Monitor Display for Turing Pi 2
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/turing_pi_2_screen
+ExecStart=/usr/bin/python3 /home/pi/turing_pi_2_screen/temp_monitor.py
+Restart=always
+RestartSec=10
+# Ensure display is cleared on stop
+ExecStop=/bin/bash -c 'python3 -c "from board import SCL, SDA; import busio; import adafruit_ssd1306; i2c = busio.I2C(SCL, SDA); display = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c); display.fill(0); display.show()"'
+
+[Install]
+WantedBy=multi-user.target

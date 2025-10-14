@@ -1,0 +1,54 @@
+# Example configurations for different setups
+
+# ===== EXAMPLE 1: Using hostnames =====
+[nodes]
+other_nodes = node1,node2,node3
+port = 5000
+stats_interval = 1
+
+[display]
+# Update interval in seconds
+update_interval = 5
+
+# Screen rotation interval (seconds) - time on each screen before switching
+screen_rotation_interval = 10
+
+# ===== EXAMPLE 2: Using IP addresses =====
+# [nodes]
+# other_nodes = 192.168.1.101,192.168.1.102,192.168.1.103
+# port = 5000
+# stats_interval = 1
+
+# [display]
+# update_interval = 5
+# screen_rotation_interval = 10
+
+# ===== EXAMPLE 3: Faster updates, slower rotation =====
+# [nodes]
+# other_nodes = 192.168.1.101,192.168.1.102,192.168.1.103
+# port = 5000
+# stats_interval = 0.5
+
+# [display]
+# update_interval = 3
+# screen_rotation_interval = 15
+
+# ===== EXAMPLE 4: Only 2 other nodes =====
+# [nodes]
+# other_nodes = node1,node2
+# port = 5000
+# stats_interval = 1
+
+# [display]
+# update_interval = 5
+# screen_rotation_interval = 10
+
+# ===== EXAMPLE 5: Lower CPU usage on stats collection =====
+# [nodes]
+# other_nodes = 192.168.1.101,192.168.1.102,192.168.1.103
+# port = 8080
+# stats_interval = 2
+
+# [display]
+# update_interval = 10
+# screen_rotation_interval = 20

@@ -1,0 +1,14 @@
+[Unit]
+Description=System Stats Server for Turing Pi 2
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/turing_pi_2_screen
+ExecStart=/usr/bin/python3 /home/pi/turing_pi_2_screen/temp_server.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
