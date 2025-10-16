@@ -14,6 +14,8 @@ import board
 import busio
 from PIL import Image, ImageDraw, ImageFont
 import adafruit_ssd1306  # SSD1306 driver works for most SPI OLED displays
+# Uncomment next line if your display needs SH1106 driver instead:
+# import adafruit_sh1106
 import signal
 import sys
 
@@ -35,6 +37,9 @@ RESET_PIN = config.getint('display', 'reset_pin', fallback=25)
 CS_PIN = config.getint('display', 'cs_pin', fallback=8)
 DISPLAY_WIDTH = config.getint('display', 'width', fallback=128)
 DISPLAY_HEIGHT = config.getint('display', 'height', fallback=64)
+DISPLAY_TYPE = config.get('display', 'type', fallback='SSD1306')  # SSD1306 or SH1106
+BAUDRATE = config.getint('display', 'baudrate', fallback=8000000)
+EXTERNAL_VCC = config.getboolean('display', 'external_vcc', fallback=False)
 
 # SPI display setup for OLED (e.g., SSD1306, SH1106, etc.)
 print("Initializing SPI display...")
@@ -80,14 +85,37 @@ print(f"  CS Pin: GPIO {CS_PIN}")
 print(f"  DC Pin: GPIO {DC_PIN}")
 print(f"  Reset Pin: GPIO {RESET_PIN}")
 print(f"  Display: {DISPLAY_WIDTH}x{DISPLAY_HEIGHT}")
+print(f"  Type: {DISPLAY_TYPE}")
+print(f"  Baudrate: {BAUDRATE}")
 
 for attempt in range(max_retries):
     try:
         print(f"Attempting to initialize SPI display (attempt {attempt + 1}/{max_retries})...")
-        display = adafruit_ssd1306.SSD1306_SPI(
-            DISPLAY_WIDTH, DISPLAY_HEIGHT, spi, dc, reset, cs, baudrate=8000000
-        )
-        print(f"✓ SPI display initialized successfully")
+        
+        # Try different display drivers based on configuration
+        if DISPLAY_TYPE.upper() == 'SH1106':
+            try:
+                import adafruit_sh1106
+                display = adafruit_sh1106.SH1106_SPI(
+                    DISPLAY_WIDTH, DISPLAY_HEIGHT, spi, dc, reset, cs, baudrate=BAUDRATE
+                )
+                print(f"✓ SH1106 SPI display initialized successfully")
+            except ImportError:
+                print("SH1106 driver not available, install with: pip3 install adafruit-circuitpython-sh1106")
+                print("Falling back to SSD1306...")
+                display = adafruit_ssd1306.SSD1306_SPI(
+                    DISPLAY_WIDTH, DISPLAY_HEIGHT, spi, dc, reset, cs, 
+                    baudrate=BAUDRATE, external_vcc=EXTERNAL_VCC
+                )
+                print(f"✓ SSD1306 SPI display initialized successfully")
+        else:
+            # Default to SSD1306
+            display = adafruit_ssd1306.SSD1306_SPI(
+                DISPLAY_WIDTH, DISPLAY_HEIGHT, spi, dc, reset, cs, 
+                baudrate=BAUDRATE, external_vcc=EXTERNAL_VCC
+            )
+            print(f"✓ SSD1306 SPI display initialized successfully")
+        
         break
     except Exception as e:
         if attempt < max_retries - 1:

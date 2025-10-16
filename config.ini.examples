@@ -21,6 +21,9 @@ reset_pin = 25
 cs_pin = 8
 width = 128
 height = 64
+type = SSD1306
+baudrate = 8000000
+external_vcc = false
 
 # ===== EXAMPLE 2: Using IP addresses =====
 # [nodes]
@@ -98,3 +101,8 @@ height = 64
 # - RST (Reset): GPIO 25 (Pin 22) - Configurable via reset_pin
 # - VCC: 3.3V or 5V (Pin 1 or Pin 2)
 # - GND: Ground (Pin 6, 9, 14, 20, 25, 30, 34, or 39)
+#
+# Display Type Options:
+# - type: SSD1306 (most common) or SH1106 (alternative driver)
+# - baudrate: SPI speed in Hz (try lower values if text is garbled)
+# - external_vcc: true/false (depends on display power configuration)
