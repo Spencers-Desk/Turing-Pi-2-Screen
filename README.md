@@ -1,6 +1,6 @@
 # Turing Pi 2 System Monitor
 
-Monitors temperature, CPU, RAM, disk, and network stats across 4 CM4 nodes. Displays on I2C OLED.
+Monitors temperature, CPU, RAM, disk, and network stats across 4 CM4 nodes. Displays on SPI OLED.
 
 Uses HTTP instead of SSH. Auto-starts on boot via systemd. All 4 nodes (including display node) expose stats via HTTP API.
 
@@ -31,10 +31,10 @@ Installs Flask/psutil, sets up systemd service, starts server on port 5000.
 
 ### Display node
 
-1. Enable I2C:
+1. Enable SPI:
    ```bash
    sudo raspi-config
-   # Interface Options -> I2C -> Enable
+   # Interface Options -> SPI -> Enable
    # Reboot
    ```
 
@@ -43,6 +43,7 @@ Installs Flask/psutil, sets up systemd service, starts server on port 5000.
    - `port`: Server port (default: 5000)
    - `update_interval`: Seconds between updates
    - `screen_rotation_interval`: Seconds on each screen
+   - SPI display settings: `spi_port`, `spi_device`, `dc_pin`, `reset_pin`, `cs_pin`, `width`, `height`
 
 3. Install:
    ```bash
@@ -77,6 +78,13 @@ python3 temp_monitor.py
 **[display]**
 - `update_interval`: Seconds between data updates (default: 5)
 - `screen_rotation_interval`: Seconds on each screen before switching (default: 10)
+- `spi_port`: SPI port number (default: 0)
+- `spi_device`: SPI device number (default: 0)
+- `dc_pin`: Data/Command pin GPIO number (default: 24)
+- `reset_pin`: Reset pin GPIO number (default: 25)
+- `cs_pin`: Chip Select pin GPIO number (default: 8)
+- `width`: Display width in pixels (default: 128)
+- `height`: Display height in pixels (default: 64)
 
 ## Display Layout
 
@@ -154,8 +162,30 @@ Test: `curl http://node0:5000/stats` (or use display node's IP/hostname)
 
 ## Notes
 
-- Uses 2.42 inch SSD1309 OLED display (128x64 pixels) on I2C
-- SSD1309 is controlled using the SSD1306 driver (compatible)
-- Assumes display is connected to default I2C pins
+- Uses SPI OLED display (e.g., SSD1306, SH1106, 128x64 pixels) on SPI bus
+- Default SPI pin configuration:
+  - MOSI (Data): GPIO 10 (Pin 19)
+  - SCLK (Clock): GPIO 11 (Pin 23)  
+  - CS (Chip Select): GPIO 8 (Pin 24) - configurable
+  - DC (Data/Command): GPIO 24 (Pin 18) - configurable
+  - RST (Reset): GPIO 25 (Pin 22) - configurable
+- Display dimensions and pins are configurable via config.ini
 - Local node is labeled "Node0", others are "Node1", "Node2", "Node3"
-- If a node is unreachable, it will show "--" instead of temperature
+- If a node is unreachable, it will show "OFFLINE" instead of stats
+
+## SPI Display Wiring
+
+**Required connections:**
+```
+Display Pin -> Raspberry Pi Pin
+VCC         -> 3.3V (Pin 1) or 5V (Pin 2)
+GND         -> Ground (Pin 6, 9, 14, 20, 25, 30, 34, or 39)
+MOSI/DIN    -> GPIO 10 (Pin 19) [Hardware SPI]
+SCLK/CLK    -> GPIO 11 (Pin 23) [Hardware SPI]
+CS          -> GPIO 8 (Pin 24) [Default, configurable]
+DC/A0       -> GPIO 24 (Pin 18) [Default, configurable]  
+RST/RES     -> GPIO 25 (Pin 22) [Default, configurable]
+```
+
+**Pin customization:**
+Edit `config.ini` to change CS, DC, and RST pin assignments. MOSI and SCLK must use hardware SPI pins.

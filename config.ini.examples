@@ -13,6 +13,15 @@ update_interval = 5
 # Screen rotation interval (seconds) - time on each screen before switching
 screen_rotation_interval = 10
 
+# SPI display configuration
+spi_port = 0
+spi_device = 0
+dc_pin = 24
+reset_pin = 25
+cs_pin = 8
+width = 128
+height = 64
+
 # ===== EXAMPLE 2: Using IP addresses =====
 # [nodes]
 # other_nodes = 192.168.1.101,192.168.1.102,192.168.1.103
@@ -22,6 +31,13 @@ screen_rotation_interval = 10
 # [display]
 # update_interval = 5
 # screen_rotation_interval = 10
+# spi_port = 0
+# spi_device = 0
+# dc_pin = 24
+# reset_pin = 25
+# cs_pin = 8
+# width = 128
+# height = 64
 
 # ===== EXAMPLE 3: Faster updates, slower rotation =====
 # [nodes]
@@ -32,6 +48,13 @@ screen_rotation_interval = 10
 # [display]
 # update_interval = 3
 # screen_rotation_interval = 15
+# spi_port = 0
+# spi_device = 0
+# dc_pin = 24
+# reset_pin = 25
+# cs_pin = 8
+# width = 128
+# height = 64
 
 # ===== EXAMPLE 4: Only 2 other nodes =====
 # [nodes]
@@ -42,6 +65,13 @@ screen_rotation_interval = 10
 # [display]
 # update_interval = 5
 # screen_rotation_interval = 10
+# spi_port = 0
+# spi_device = 0
+# dc_pin = 24
+# reset_pin = 25
+# cs_pin = 8
+# width = 128
+# height = 64
 
 # ===== EXAMPLE 5: Lower CPU usage on stats collection =====
 # [nodes]
@@ -52,3 +82,19 @@ screen_rotation_interval = 10
 # [display]
 # update_interval = 10
 # screen_rotation_interval = 20
+# spi_port = 0
+# spi_device = 0
+# dc_pin = 24
+# reset_pin = 25
+# cs_pin = 8
+# width = 128
+# height = 64
+
+# SPI Display Pin Configuration:
+# - MOSI (Data): GPIO 10 (Pin 19) - Hardware SPI
+# - SCLK (Clock): GPIO 11 (Pin 23) - Hardware SPI  
+# - CS (Chip Select): GPIO 8 (Pin 24) - Hardware SPI, or custom pin via cs_pin
+# - DC (Data/Command): GPIO 24 (Pin 18) - Configurable via dc_pin
+# - RST (Reset): GPIO 25 (Pin 22) - Configurable via reset_pin
+# - VCC: 3.3V or 5V (Pin 1 or Pin 2)
+# - GND: Ground (Pin 6, 9, 14, 20, 25, 30, 34, or 39)

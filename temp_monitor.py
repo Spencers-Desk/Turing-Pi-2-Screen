@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 System monitor for Turing Pi 2 cluster
-Displays temperature, CPU, RAM, and network stats on I2C OLED display
+Displays temperature, CPU, RAM, and network stats on SPI OLED display
 """
 
 import time
@@ -9,10 +9,11 @@ import configparser
 import os
 import requests
 import psutil
-from board import SCL, SDA
+import digitalio
+import board
 import busio
 from PIL import Image, ImageDraw, ImageFont
-import adafruit_ssd1306  # SSD1309 uses the SSD1306 driver
+import adafruit_ssd1306  # SSD1306 driver works for most SPI OLED displays
 import signal
 import sys
 
@@ -26,47 +27,67 @@ NODE_PORT = config.getint('nodes', 'port')
 UPDATE_INTERVAL = config.getint('display', 'update_interval')
 SCREEN_ROTATION_INTERVAL = config.getint('display', 'screen_rotation_interval')
 
-# I2C display setup for SSD1309 2.42 inch OLED (128x64)
-# Note: SSD1309 uses the SSD1306 driver (fully compatible)
-i2c = busio.I2C(SCL, SDA)
+# SPI display configuration
+SPI_PORT = config.getint('display', 'spi_port', fallback=0)
+SPI_DEVICE = config.getint('display', 'spi_device', fallback=0) 
+DC_PIN = config.getint('display', 'dc_pin', fallback=24)
+RESET_PIN = config.getint('display', 'reset_pin', fallback=25)
+CS_PIN = config.getint('display', 'cs_pin', fallback=8)
+DISPLAY_WIDTH = config.getint('display', 'width', fallback=128)
+DISPLAY_HEIGHT = config.getint('display', 'height', fallback=64)
 
-# Try to initialize display with common I2C addresses
-# Retry multiple times due to intermittent connection issues
+# SPI display setup for OLED (e.g., SSD1306, SH1106, etc.)
+print("Initializing SPI display...")
+
+# Initialize SPI bus
+spi = busio.SPI(board.SCK, MOSI=board.MOSI)
+
+# Define control pins
+cs = digitalio.DigitalInOut(getattr(board, f'D{CS_PIN}'))
+dc = digitalio.DigitalInOut(getattr(board, f'D{DC_PIN}'))
+reset = digitalio.DigitalInOut(getattr(board, f'D{RESET_PIN}'))
+
+# Initialize display with retry logic
 display = None
-max_retries = 20
+max_retries = 10
 retry_delay = 0.5
 
-for addr in [0x3C, 0x3D]:
-    for attempt in range(max_retries):
-        try:
-            print(f"Trying I2C address 0x{addr:02X} (attempt {attempt + 1}/{max_retries})...")
-            display = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c, addr=addr, reset=None)
-            print(f"✓ Display found at address 0x{addr:02X}")
-            break
-        except Exception as e:
-            if attempt < max_retries - 1:
-                print(f"  Retry {attempt + 1}: {e}")
-                time.sleep(retry_delay)
-            else:
-                print(f"  Failed after {max_retries} attempts: {e}")
-    
-    if display is not None:
+for attempt in range(max_retries):
+    try:
+        print(f"Attempting to initialize SPI display (attempt {attempt + 1}/{max_retries})...")
+        display = adafruit_ssd1306.SSD1306_SPI(
+            DISPLAY_WIDTH, DISPLAY_HEIGHT, spi, dc, reset, cs
+        )
+        print(f"✓ SPI display initialized successfully")
         break
+    except Exception as e:
+        if attempt < max_retries - 1:
+            print(f"  Retry {attempt + 1}: {e}")
+            time.sleep(retry_delay)
+        else:
+            print(f"  Failed after {max_retries} attempts: {e}")
 
 if display is None:
     print("=" * 60)
-    print("ERROR: Could not find SSD1309 display on I2C bus!")
+    print("ERROR: Could not initialize SPI OLED display!")
     print("=" * 60)
-    print("The display appears intermittently on I2C scans but cannot")
-    print("be initialized. This suggests:")
-    print("  1. Faulty jumper wires - try different wires")
-    print("  2. Loose connections - check all 4 pins are VERY secure")
-    print("  3. Faulty display I2C interface")
-    print("  4. Wrong display type - verify it's I2C not SPI")
+    print("Possible issues:")
+    print("  1. Incorrect wiring - verify all SPI connections")
+    print("  2. Wrong pin configuration in config.ini")
+    print("  3. SPI not enabled on Raspberry Pi")
+    print("  4. Incompatible display type")
     print()
-    print("Quick test:")
-    print("  for i in {1..10}; do sudo i2cdetect -y 1 | grep 3c; done")
-    print("  Should show '3c' on ALL 10 lines if connection is stable")
+    print("SPI Configuration:")
+    print(f"  MOSI: GPIO 10 (Pin 19)")
+    print(f"  SCLK: GPIO 11 (Pin 23)")
+    print(f"  CS:   GPIO {CS_PIN} (as configured)")
+    print(f"  DC:   GPIO {DC_PIN} (as configured)")
+    print(f"  RST:  GPIO {RESET_PIN} (as configured)")
+    print()
+    print("Enable SPI:")
+    print("  sudo raspi-config")
+    print("  -> Interface Options -> SPI -> Enable")
+    print("  -> Reboot")
     sys.exit(1)
 
 # Clear display on startup to remove random pixels
@@ -156,7 +177,7 @@ def get_node_name(index):
 def display_screen1(all_stats):
     """Screen 1: CPU Temp, Usage, RAM, Disk"""
     display.fill(0)
-    image = Image.new("1", (display.width, display.height))
+    image = Image.new("1", (DISPLAY_WIDTH, DISPLAY_HEIGHT))
     draw = ImageDraw.Draw(image)
     font = ImageFont.load_default()
     
@@ -183,7 +204,7 @@ def display_screen1(all_stats):
 def display_screen2(all_stats):
     """Screen 2: Network rates, Uptime"""
     display.fill(0)
-    image = Image.new("1", (display.width, display.height))
+    image = Image.new("1", (DISPLAY_WIDTH, DISPLAY_HEIGHT))
     draw = ImageDraw.Draw(image)
     font = ImageFont.load_default()
     

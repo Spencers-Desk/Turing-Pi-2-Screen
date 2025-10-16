@@ -1,74 +1,110 @@
 #!/usr/bin/env python3
 """
-Test script to detect SSD1309 display on I2C bus
+Test script to detect SPI OLED display
 Run this to troubleshoot display connection issues
 """
 
 import sys
+import configparser
+import os
+import digitalio
+import board
 import busio
-from board import SCL, SDA
-import adafruit_ssd1306  # SSD1309 uses the SSD1306 driver
+import adafruit_ssd1306  # SSD1306 driver works for most SPI OLED displays
 
-print("SSD1309 Display Detection Test")
+print("SPI OLED Display Detection Test")
 print("=" * 50)
 print()
 
-# Check if I2C devices exist
-print("Available I2C devices:")
-import os
-i2c_devices = [f for f in os.listdir('/dev') if f.startswith('i2c-')]
-for dev in i2c_devices:
-    print(f"  /dev/{dev}")
+# Load configuration
+config = configparser.ConfigParser()
+config_path = os.path.join(os.path.dirname(__file__), 'config.ini')
+if os.path.exists(config_path):
+    config.read(config_path)
+    print("✓ Configuration loaded from config.ini")
+else:
+    print("⚠ config.ini not found, using default values")
+    config.add_section('display')
+
+# Get SPI configuration with fallbacks
+SPI_PORT = config.getint('display', 'spi_port', fallback=0)
+SPI_DEVICE = config.getint('display', 'spi_device', fallback=0) 
+DC_PIN = config.getint('display', 'dc_pin', fallback=24)
+RESET_PIN = config.getint('display', 'reset_pin', fallback=25)
+CS_PIN = config.getint('display', 'cs_pin', fallback=8)
+DISPLAY_WIDTH = config.getint('display', 'width', fallback=128)
+DISPLAY_HEIGHT = config.getint('display', 'height', fallback=64)
+
+print(f"SPI Configuration:")
+print(f"  Port: {SPI_PORT}, Device: {SPI_DEVICE}")
+print(f"  DC Pin: GPIO {DC_PIN}")
+print(f"  Reset Pin: GPIO {RESET_PIN}") 
+print(f"  CS Pin: GPIO {CS_PIN}")
+print(f"  Display Size: {DISPLAY_WIDTH}x{DISPLAY_HEIGHT}")
 print()
 
-# Try to initialize I2C
-print("Initializing I2C bus...")
+# Check if SPI devices exist
+print("Available SPI devices:")
+spi_devices = [f for f in os.listdir('/dev') if f.startswith('spidev')]
+for dev in spi_devices:
+    print(f"  /dev/{dev}")
+if not spi_devices:
+    print("  No SPI devices found!")
+    print("  Make sure SPI is enabled: sudo raspi-config -> Interface Options -> SPI")
+print()
+
+# Try to initialize SPI bus
+print("Initializing SPI bus...")
 try:
-    i2c = busio.I2C(SCL, SDA)
-    print("✓ I2C bus initialized successfully")
+    spi = busio.SPI(board.SCK, MOSI=board.MOSI)
+    print("✓ SPI bus initialized successfully")
 except Exception as e:
-    print(f"✗ Failed to initialize I2C: {e}")
+    print(f"✗ Failed to initialize SPI: {e}")
+    sys.exit(1)
+
+# Initialize control pins
+print("Setting up control pins...")
+try:
+    cs = digitalio.DigitalInOut(getattr(board, f'D{CS_PIN}'))
+    dc = digitalio.DigitalInOut(getattr(board, f'D{DC_PIN}'))
+    reset = digitalio.DigitalInOut(getattr(board, f'D{RESET_PIN}'))
+    print(f"✓ Control pins configured")
+except Exception as e:
+    print(f"✗ Failed to configure pins: {e}")
+    print(f"  Make sure GPIO pins {CS_PIN}, {DC_PIN}, {RESET_PIN} are valid")
     sys.exit(1)
 
 print()
-print("Scanning for display at common I2C addresses...")
+print("Attempting to initialize SPI display...")
 
-# Try common addresses
-addresses = [0x3C, 0x3D]
-display_found = False
-
-for addr in addresses:
-    try:
-        print(f"  Trying address 0x{addr:02X}...", end=" ")
-        display = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c, addr=addr)
-        print(f"✓ DISPLAY FOUND!")
-        
-        # Test the display
-        print(f"  Testing display...")
-        display.fill(0)
-        display.show()
-        print(f"  ✓ Display cleared successfully")
-        
-        # Draw a test pattern
-        display.fill(1)
-        display.show()
-        print(f"  ✓ Display filled successfully")
-        
-        # Clear again
-        display.fill(0)
-        display.show()
-        print(f"  ✓ Display test complete")
-        
-        display_found = True
-        print()
-        print(f"SUCCESS: SSD1309 display is working at address 0x{addr:02X}")
-        break
-        
-    except Exception as e:
-        print(f"✗ Not found - {e}")
-
-print()
-if not display_found:
+try:
+    display = adafruit_ssd1306.SSD1306_SPI(
+        DISPLAY_WIDTH, DISPLAY_HEIGHT, spi, dc, reset, cs
+    )
+    print(f"✓ DISPLAY FOUND!")
+    
+    # Test the display
+    print(f"  Testing display...")
+    display.fill(0)
+    display.show()
+    print(f"  ✓ Display cleared successfully")
+    
+    # Draw a test pattern
+    display.fill(1)
+    display.show()
+    print(f"  ✓ Display filled successfully")
+    
+    # Clear again
+    display.fill(0)
+    display.show()
+    print(f"  ✓ Display test complete")
+    
+    print()
+    print("SUCCESS: SPI OLED display is working!")
+    
+except Exception as e:
+    print(f"✗ Display initialization failed: {e}")
+    print()
     print("=" * 50)
     print("DISPLAY NOT FOUND")
     print("=" * 50)
@@ -77,19 +113,20 @@ if not display_found:
     print("1. Check physical connections:")
     print("   - VCC to 3.3V or 5V")
     print("   - GND to Ground")
-    print("   - SCL to GPIO3 (Pin 5)")
-    print("   - SDA to GPIO2 (Pin 3)")
+    print(f"   - MOSI to GPIO 10 (Pin 19)")
+    print(f"   - SCLK to GPIO 11 (Pin 23)")
+    print(f"   - CS to GPIO {CS_PIN} (Pin based on your config)")
+    print(f"   - DC to GPIO {DC_PIN} (Pin based on your config)")
+    print(f"   - RST to GPIO {RESET_PIN} (Pin based on your config)")
     print()
-    print("2. Verify I2C is enabled:")
+    print("2. Verify SPI is enabled:")
     print("   sudo raspi-config")
-    print("   -> Interface Options -> I2C -> Enable")
+    print("   -> Interface Options -> SPI -> Enable")
     print("   -> Reboot")
     print()
-    print("3. Check if display appears on I2C bus:")
-    print("   sudo apt-get install -y i2c-tools")
-    print("   sudo i2cdetect -y 1")
+    print("3. Check SPI devices:")
+    print("   ls -la /dev/spi*")
     print()
-    print("4. Check I2C permissions:")
-    print("   sudo usermod -aG i2c $USER")
-    print("   (then logout and login again)")
+    print("4. Verify wiring with multimeter if available")
+    print("5. Try different display types (SSD1306, SH1106, etc.)")
     sys.exit(1)

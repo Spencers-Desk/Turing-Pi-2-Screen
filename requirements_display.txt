@@ -1,4 +1,6 @@
 adafruit-circuitpython-ssd1306
+adafruit-blinka
+digitalio
 Pillow
 requests
 psutil
