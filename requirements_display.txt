@@ -1,6 +1,7 @@
 adafruit-circuitpython-ssd1306
 adafruit-blinka
-digitalio
+adafruit-circuitpython-busdevice
+RPi.GPIO
 Pillow
 requests
 psutil

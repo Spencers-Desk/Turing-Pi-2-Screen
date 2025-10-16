@@ -38,14 +38,26 @@ Installs Flask/psutil, sets up systemd service, starts server on port 5000.
    # Reboot
    ```
 
-2. Edit `config.ini`:
+2. Add user to SPI group:
+   ```bash
+   sudo usermod -aG spi $USER
+   sudo usermod -aG gpio $USER
+   # Logout and login again
+   ```
+
+3. Edit `config.ini`:
    - `other_nodes`: Comma-separated hostnames or IPs
    - `port`: Server port (default: 5000)
    - `update_interval`: Seconds between updates
    - `screen_rotation_interval`: Seconds on each screen
    - SPI display settings: `spi_port`, `spi_device`, `dc_pin`, `reset_pin`, `cs_pin`, `width`, `height`
 
-3. Install:
+4. Test display connection:
+   ```bash
+   python3 test_display.py
+   ```
+
+5. Install:
    ```bash
    ./install_display.sh
    ```

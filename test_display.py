@@ -65,9 +65,32 @@ except Exception as e:
 # Initialize control pins
 print("Setting up control pins...")
 try:
-    cs = digitalio.DigitalInOut(getattr(board, f'D{CS_PIN}'))
-    dc = digitalio.DigitalInOut(getattr(board, f'D{DC_PIN}'))
-    reset = digitalio.DigitalInOut(getattr(board, f'D{RESET_PIN}'))
+    # Map GPIO numbers to board pin objects
+    def get_board_pin(gpio_num):
+        """Map GPIO number to board pin object"""
+        pin_map = {
+            8: board.CE0,   # Default SPI CS0
+            7: board.CE1,   # SPI CS1
+            24: board.D24,  # GPIO 24
+            25: board.D25,  # GPIO 25
+            23: board.D23,  # GPIO 23
+            22: board.D22,  # GPIO 22
+            18: board.D18,  # GPIO 18
+            16: board.D16,  # GPIO 16
+            12: board.D12,  # GPIO 12
+            6: board.D6,    # GPIO 6
+            5: board.D5,    # GPIO 5
+            13: board.D13,  # GPIO 13
+            19: board.D19,  # GPIO 19
+            26: board.D26,  # GPIO 26
+            21: board.D21,  # GPIO 21
+            20: board.D20,  # GPIO 20
+        }
+        return pin_map.get(gpio_num, getattr(board, f'D{gpio_num}', None))
+
+    cs = digitalio.DigitalInOut(get_board_pin(CS_PIN))
+    dc = digitalio.DigitalInOut(get_board_pin(DC_PIN))
+    reset = digitalio.DigitalInOut(get_board_pin(RESET_PIN))
     print(f"✓ Control pins configured")
 except Exception as e:
     print(f"✗ Failed to configure pins: {e}")
@@ -79,7 +102,7 @@ print("Attempting to initialize SPI display...")
 
 try:
     display = adafruit_ssd1306.SSD1306_SPI(
-        DISPLAY_WIDTH, DISPLAY_HEIGHT, spi, dc, reset, cs
+        DISPLAY_WIDTH, DISPLAY_HEIGHT, spi, dc, reset, cs, baudrate=8000000
     )
     print(f"✓ DISPLAY FOUND!")
     
