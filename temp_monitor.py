@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 System monitor for Turing Pi 2 cluster
-Displays temperature, CPU, RAM, and network stats on SPI OLED display
+Displays temperature, CPU, RAM, and network stats on I2C OLED display
 """
 
 import time
@@ -9,13 +9,10 @@ import configparser
 import os
 import requests
 import psutil
-import digitalio
-import board
+from board import SCL, SDA
 import busio
 from PIL import Image, ImageDraw, ImageFont
-import adafruit_ssd1306  # SSD1306 driver works for most SPI OLED displays
-# Uncomment next line if your display needs SH1106 driver instead:
-# import adafruit_sh1106
+import adafruit_ssd1306  # SSD1306/SSD1309 driver for I2C displays
 import signal
 import sys
 
@@ -29,122 +26,74 @@ NODE_PORT = config.getint('nodes', 'port')
 UPDATE_INTERVAL = config.getint('display', 'update_interval')
 SCREEN_ROTATION_INTERVAL = config.getint('display', 'screen_rotation_interval')
 
-# SPI display configuration
-SPI_PORT = config.getint('display', 'spi_port', fallback=0)
-SPI_DEVICE = config.getint('display', 'spi_device', fallback=0) 
-DC_PIN = config.getint('display', 'dc_pin', fallback=24)
-RESET_PIN = config.getint('display', 'reset_pin', fallback=25)
-CS_PIN = config.getint('display', 'cs_pin', fallback=8)
+# I2C display configuration
+I2C_ADDRESS = config.get('display', 'i2c_address', fallback='0x3C')
 DISPLAY_WIDTH = config.getint('display', 'width', fallback=128)
 DISPLAY_HEIGHT = config.getint('display', 'height', fallback=64)
-DISPLAY_TYPE = config.get('display', 'type', fallback='SSD1306')  # SSD1306 or SH1106
-BAUDRATE = config.getint('display', 'baudrate', fallback=8000000)
-EXTERNAL_VCC = config.getboolean('display', 'external_vcc', fallback=False)
 
-# SPI display setup for OLED (e.g., SSD1306, SH1106, etc.)
-print("Initializing SPI display...")
+# I2C display setup for OLED (e.g., SSD1306, SSD1309)
+print("Initializing I2C display...")
 
-# Initialize SPI bus
-spi = busio.SPI(board.SCK, MOSI=board.MOSI)
-
-# Define control pins using correct board pin references
-# Map GPIO numbers to board pin names
-def get_board_pin(gpio_num):
-    """Map GPIO number to board pin object"""
-    pin_map = {
-        8: board.CE0,   # Default SPI CS0
-        7: board.CE1,   # SPI CS1
-        24: board.D24,  # GPIO 24
-        25: board.D25,  # GPIO 25
-        23: board.D23,  # GPIO 23
-        22: board.D22,  # GPIO 22
-        18: board.D18,  # GPIO 18
-        16: board.D16,  # GPIO 16
-        12: board.D12,  # GPIO 12
-        6: board.D6,    # GPIO 6
-        5: board.D5,    # GPIO 5
-        13: board.D13,  # GPIO 13
-        19: board.D19,  # GPIO 19
-        26: board.D26,  # GPIO 26
-        21: board.D21,  # GPIO 21
-        20: board.D20,  # GPIO 20
-    }
-    return pin_map.get(gpio_num, getattr(board, f'D{gpio_num}', None))
-
-cs = digitalio.DigitalInOut(get_board_pin(CS_PIN))
-dc = digitalio.DigitalInOut(get_board_pin(DC_PIN))
-reset = digitalio.DigitalInOut(get_board_pin(RESET_PIN))
+# Initialize I2C bus
+i2c = busio.I2C(SCL, SDA)
 
 # Initialize display with retry logic
 display = None
-max_retries = 10
+max_retries = 20
 retry_delay = 0.5
 
-print(f"SPI Configuration:")
-print(f"  CS Pin: GPIO {CS_PIN}")
-print(f"  DC Pin: GPIO {DC_PIN}")
-print(f"  Reset Pin: GPIO {RESET_PIN}")
+print(f"I2C Configuration:")
+print(f"  Address: {I2C_ADDRESS}")
 print(f"  Display: {DISPLAY_WIDTH}x{DISPLAY_HEIGHT}")
-print(f"  Type: {DISPLAY_TYPE}")
-print(f"  Baudrate: {BAUDRATE}")
 
-for attempt in range(max_retries):
-    try:
-        print(f"Attempting to initialize SPI display (attempt {attempt + 1}/{max_retries})...")
-        
-        # Try different display drivers based on configuration
-        if DISPLAY_TYPE.upper() == 'SH1106':
-            try:
-                import adafruit_sh1106
-                display = adafruit_sh1106.SH1106_SPI(
-                    DISPLAY_WIDTH, DISPLAY_HEIGHT, spi, dc, reset, cs, baudrate=BAUDRATE
-                )
-                print(f"✓ SH1106 SPI display initialized successfully")
-            except ImportError:
-                print("SH1106 driver not available, install with: pip3 install adafruit-circuitpython-sh1106")
-                print("Falling back to SSD1306...")
-                display = adafruit_ssd1306.SSD1306_SPI(
-                    DISPLAY_WIDTH, DISPLAY_HEIGHT, spi, dc, reset, cs, 
-                    baudrate=BAUDRATE, external_vcc=EXTERNAL_VCC
-                )
-                print(f"✓ SSD1306 SPI display initialized successfully")
-        else:
-            # Default to SSD1306
-            display = adafruit_ssd1306.SSD1306_SPI(
-                DISPLAY_WIDTH, DISPLAY_HEIGHT, spi, dc, reset, cs, 
-                baudrate=BAUDRATE, external_vcc=EXTERNAL_VCC
-            )
-            print(f"✓ SSD1306 SPI display initialized successfully")
-        
+# Convert hex string to int
+addr = int(I2C_ADDRESS, 16) if isinstance(I2C_ADDRESS, str) else I2C_ADDRESS
+
+# Try common I2C addresses if the configured one fails
+addresses_to_try = [addr]
+if addr not in [0x3C, 0x3D]:
+    addresses_to_try.extend([0x3C, 0x3D])
+
+for addr in addresses_to_try:
+    for attempt in range(max_retries):
+        try:
+            print(f"Trying I2C address 0x{addr:02X} (attempt {attempt + 1}/{max_retries})...")
+            display = adafruit_ssd1306.SSD1306_I2C(DISPLAY_WIDTH, DISPLAY_HEIGHT, i2c, addr=addr, reset=None)
+            print(f"✓ Display found at address 0x{addr:02X}")
+            break
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"  Retry {attempt + 1}: {e}")
+                time.sleep(retry_delay)
+            else:
+                print(f"  Failed after {max_retries} attempts: {e}")
+    
+    if display is not None:
         break
-    except Exception as e:
-        if attempt < max_retries - 1:
-            print(f"  Retry {attempt + 1}: {e}")
-            time.sleep(retry_delay)
-        else:
-            print(f"  Failed after {max_retries} attempts: {e}")
 
 if display is None:
     print("=" * 60)
-    print("ERROR: Could not initialize SPI OLED display!")
+    print("ERROR: Could not find I2C OLED display!")
     print("=" * 60)
-    print("Possible issues:")
-    print("  1. Incorrect wiring - verify all SPI connections")
-    print("  2. Wrong pin configuration in config.ini")
-    print("  3. SPI not enabled on Raspberry Pi")
-    print("  4. Incompatible display type")
+    print("Troubleshooting steps:")
+    print("  1. Check physical connections:")
+    print("     - VCC to 3.3V or 5V")
+    print("     - GND to Ground")
+    print("     - SCL to GPIO3 (Pin 5)")
+    print("     - SDA to GPIO2 (Pin 3)")
     print()
-    print("SPI Configuration:")
-    print(f"  MOSI: GPIO 10 (Pin 19)")
-    print(f"  SCLK: GPIO 11 (Pin 23)")
-    print(f"  CS:   GPIO {CS_PIN} (as configured)")
-    print(f"  DC:   GPIO {DC_PIN} (as configured)")
-    print(f"  RST:  GPIO {RESET_PIN} (as configured)")
+    print("  2. Verify I2C is enabled:")
+    print("     sudo raspi-config")
+    print("     -> Interface Options -> I2C -> Enable")
+    print("     -> Reboot")
     print()
-    print("Enable SPI:")
-    print("  sudo raspi-config")
-    print("  -> Interface Options -> SPI -> Enable")
-    print("  -> Reboot")
+    print("  3. Check if display appears on I2C bus:")
+    print("     sudo apt-get install -y i2c-tools")
+    print("     sudo i2cdetect -y 1")
+    print()
+    print("  4. Check I2C permissions:")
+    print("     sudo usermod -aG i2c $USER")
+    print("     (then logout and login again)")
     sys.exit(1)
 
 # Clear display on startup to remove random pixels

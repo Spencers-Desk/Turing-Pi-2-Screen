@@ -1,6 +1,6 @@
 # Turing Pi 2 System Monitor
 
-Monitors temperature, CPU, RAM, disk, and network stats across 4 CM4 nodes. Displays on SPI OLED.
+Monitors temperature, CPU, RAM, disk, and network stats across 4 CM4 nodes. Displays on I2C OLED.
 
 Uses HTTP instead of SSH. Auto-starts on boot via systemd. All 4 nodes (including display node) expose stats via HTTP API.
 
@@ -31,33 +31,26 @@ Installs Flask/psutil, sets up systemd service, starts server on port 5000.
 
 ### Display node
 
-1. Enable SPI:
+1. Enable I2C:
    ```bash
    sudo raspi-config
-   # Interface Options -> SPI -> Enable
+   # Interface Options -> I2C -> Enable
    # Reboot
    ```
 
-2. Add user to SPI group:
-   ```bash
-   sudo usermod -aG spi $USER
-   sudo usermod -aG gpio $USER
-   # Logout and login again
-   ```
-
-3. Edit `config.ini`:
+2. Edit `config.ini`:
    - `other_nodes`: Comma-separated hostnames or IPs
    - `port`: Server port (default: 5000)
    - `update_interval`: Seconds between updates
    - `screen_rotation_interval`: Seconds on each screen
-   - SPI display settings: `spi_port`, `spi_device`, `dc_pin`, `reset_pin`, `cs_pin`, `width`, `height`
+   - I2C display settings: `i2c_address`, `width`, `height`
 
-4. Test display connection:
+3. Test display connection:
    ```bash
    python3 test_display.py
    ```
 
-5. Install:
+4. Install:
    ```bash
    ./install_display.sh
    ```
@@ -90,11 +83,7 @@ python3 temp_monitor.py
 **[display]**
 - `update_interval`: Seconds between data updates (default: 5)
 - `screen_rotation_interval`: Seconds on each screen before switching (default: 10)
-- `spi_port`: SPI port number (default: 0)
-- `spi_device`: SPI device number (default: 0)
-- `dc_pin`: Data/Command pin GPIO number (default: 24)
-- `reset_pin`: Reset pin GPIO number (default: 25)
-- `cs_pin`: Chip Select pin GPIO number (default: 8)
+- `i2c_address`: I2C address of display (default: 0x3C)
 - `width`: Display width in pixels (default: 128)
 - `height`: Display height in pixels (default: 64)
 
@@ -174,30 +163,25 @@ Test: `curl http://node0:5000/stats` (or use display node's IP/hostname)
 
 ## Notes
 
-- Uses SPI OLED display (e.g., SSD1306, SH1106, 128x64 pixels) on SPI bus
-- Default SPI pin configuration:
-  - MOSI (Data): GPIO 10 (Pin 19)
-  - SCLK (Clock): GPIO 11 (Pin 23)  
-  - CS (Chip Select): GPIO 8 (Pin 24) - configurable
-  - DC (Data/Command): GPIO 24 (Pin 18) - configurable
-  - RST (Reset): GPIO 25 (Pin 22) - configurable
-- Display dimensions and pins are configurable via config.ini
+- Uses I2C OLED display (e.g., SSD1306, SSD1309, 128x64 pixels) on I2C bus
+- Default I2C address: 0x3C (some displays use 0x3D)
+- I2C pin configuration:
+  - SCL: GPIO 3 (Pin 5) [Hardware I2C]
+  - SDA: GPIO 2 (Pin 3) [Hardware I2C]
+- Display dimensions and I2C address are configurable via config.ini
 - Local node is labeled "Node0", others are "Node1", "Node2", "Node3"
 - If a node is unreachable, it will show "OFFLINE" instead of stats
 
-## SPI Display Wiring
+## I2C Display Wiring
 
 **Required connections:**
 ```
 Display Pin -> Raspberry Pi Pin
 VCC         -> 3.3V (Pin 1) or 5V (Pin 2)
 GND         -> Ground (Pin 6, 9, 14, 20, 25, 30, 34, or 39)
-MOSI/DIN    -> GPIO 10 (Pin 19) [Hardware SPI]
-SCLK/CLK    -> GPIO 11 (Pin 23) [Hardware SPI]
-CS          -> GPIO 8 (Pin 24) [Default, configurable]
-DC/A0       -> GPIO 24 (Pin 18) [Default, configurable]  
-RST/RES     -> GPIO 25 (Pin 22) [Default, configurable]
+SCL         -> GPIO 3 (Pin 5) [Hardware I2C]
+SDA         -> GPIO 2 (Pin 3) [Hardware I2C]
 ```
 
-**Pin customization:**
-Edit `config.ini` to change CS, DC, and RST pin assignments. MOSI and SCLK must use hardware SPI pins.
+**Address detection:**
+Find your display's I2C address with: `sudo i2cdetect -y 1`

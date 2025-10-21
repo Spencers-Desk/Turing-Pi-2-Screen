@@ -13,17 +13,10 @@ update_interval = 5
 # Screen rotation interval (seconds) - time on each screen before switching
 screen_rotation_interval = 10
 
-# SPI display configuration
-spi_port = 0
-spi_device = 0
-dc_pin = 24
-reset_pin = 25
-cs_pin = 8
+# I2C display configuration
+i2c_address = 0x3C
 width = 128
 height = 64
-type = SSD1306
-baudrate = 8000000
-external_vcc = false
 
 # ===== EXAMPLE 2: Using IP addresses =====
 # [nodes]
@@ -34,11 +27,7 @@ external_vcc = false
 # [display]
 # update_interval = 5
 # screen_rotation_interval = 10
-# spi_port = 0
-# spi_device = 0
-# dc_pin = 24
-# reset_pin = 25
-# cs_pin = 8
+# i2c_address = 0x3C
 # width = 128
 # height = 64
 
@@ -51,11 +40,7 @@ external_vcc = false
 # [display]
 # update_interval = 3
 # screen_rotation_interval = 15
-# spi_port = 0
-# spi_device = 0
-# dc_pin = 24
-# reset_pin = 25
-# cs_pin = 8
+# i2c_address = 0x3C
 # width = 128
 # height = 64
 
@@ -68,11 +53,7 @@ external_vcc = false
 # [display]
 # update_interval = 5
 # screen_rotation_interval = 10
-# spi_port = 0
-# spi_device = 0
-# dc_pin = 24
-# reset_pin = 25
-# cs_pin = 8
+# i2c_address = 0x3C
 # width = 128
 # height = 64
 
@@ -85,24 +66,16 @@ external_vcc = false
 # [display]
 # update_interval = 10
 # screen_rotation_interval = 20
-# spi_port = 0
-# spi_device = 0
-# dc_pin = 24
-# reset_pin = 25
-# cs_pin = 8
+# i2c_address = 0x3C
 # width = 128
 # height = 64
 
-# SPI Display Pin Configuration:
-# - MOSI (Data): GPIO 10 (Pin 19) - Hardware SPI
-# - SCLK (Clock): GPIO 11 (Pin 23) - Hardware SPI  
-# - CS (Chip Select): GPIO 8 (Pin 24) - Hardware SPI, or custom pin via cs_pin
-# - DC (Data/Command): GPIO 24 (Pin 18) - Configurable via dc_pin
-# - RST (Reset): GPIO 25 (Pin 22) - Configurable via reset_pin
-# - VCC: 3.3V or 5V (Pin 1 or Pin 2)
+# I2C Display Pin Configuration:
+# - VCC: 3.3V (Pin 1) or 5V (Pin 2) 
 # - GND: Ground (Pin 6, 9, 14, 20, 25, 30, 34, or 39)
+# - SCL: GPIO 3 (Pin 5) [Hardware I2C]
+# - SDA: GPIO 2 (Pin 3) [Hardware I2C]
 #
-# Display Type Options:
-# - type: SSD1306 (most common) or SH1106 (alternative driver)
-# - baudrate: SPI speed in Hz (try lower values if text is garbled)
-# - external_vcc: true/false (depends on display power configuration)
+# Display Options:
+# - i2c_address: Usually 0x3C or 0x3D (check with: sudo i2cdetect -y 1)
+# - width/height: Display dimensions in pixels

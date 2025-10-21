@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 """
-Test script to detect SPI OLED display
+Test script to detect I2C OLED display
 Run this to troubleshoot display connection issues
 """
 
 import sys
 import configparser
 import os
-import digitalio
-import board
+from board import SCL, SDA
 import busio
-import adafruit_ssd1306  # SSD1306 driver works for most SPI OLED displays
+import adafruit_ssd1306  # SSD1306/SSD1309 driver for I2C displays
 
-print("SPI OLED Display Detection Test")
+print("I2C OLED Display Detection Test")
 print("=" * 50)
 print()
 
@@ -26,107 +25,79 @@ else:
     print("⚠ config.ini not found, using default values")
     config.add_section('display')
 
-# Get SPI configuration with fallbacks
-SPI_PORT = config.getint('display', 'spi_port', fallback=0)
-SPI_DEVICE = config.getint('display', 'spi_device', fallback=0) 
-DC_PIN = config.getint('display', 'dc_pin', fallback=24)
-RESET_PIN = config.getint('display', 'reset_pin', fallback=25)
-CS_PIN = config.getint('display', 'cs_pin', fallback=8)
+# Get I2C configuration with fallbacks
+I2C_ADDRESS = config.get('display', 'i2c_address', fallback='0x3C')
 DISPLAY_WIDTH = config.getint('display', 'width', fallback=128)
 DISPLAY_HEIGHT = config.getint('display', 'height', fallback=64)
 
-print(f"SPI Configuration:")
-print(f"  Port: {SPI_PORT}, Device: {SPI_DEVICE}")
-print(f"  DC Pin: GPIO {DC_PIN}")
-print(f"  Reset Pin: GPIO {RESET_PIN}") 
-print(f"  CS Pin: GPIO {CS_PIN}")
+print(f"I2C Configuration:")
+print(f"  Address: {I2C_ADDRESS}")
 print(f"  Display Size: {DISPLAY_WIDTH}x{DISPLAY_HEIGHT}")
 print()
 
-# Check if SPI devices exist
-print("Available SPI devices:")
-spi_devices = [f for f in os.listdir('/dev') if f.startswith('spidev')]
-for dev in spi_devices:
+# Check if I2C devices exist
+print("Available I2C devices:")
+i2c_devices = [f for f in os.listdir('/dev') if f.startswith('i2c-')]
+for dev in i2c_devices:
     print(f"  /dev/{dev}")
-if not spi_devices:
-    print("  No SPI devices found!")
-    print("  Make sure SPI is enabled: sudo raspi-config -> Interface Options -> SPI")
+if not i2c_devices:
+    print("  No I2C devices found!")
+    print("  Make sure I2C is enabled: sudo raspi-config -> Interface Options -> I2C")
 print()
 
-# Try to initialize SPI bus
-print("Initializing SPI bus...")
+# Try to initialize I2C bus
+print("Initializing I2C bus...")
 try:
-    spi = busio.SPI(board.SCK, MOSI=board.MOSI)
-    print("✓ SPI bus initialized successfully")
+    i2c = busio.I2C(SCL, SDA)
+    print("✓ I2C bus initialized successfully")
 except Exception as e:
-    print(f"✗ Failed to initialize SPI: {e}")
-    sys.exit(1)
-
-# Initialize control pins
-print("Setting up control pins...")
-try:
-    # Map GPIO numbers to board pin objects
-    def get_board_pin(gpio_num):
-        """Map GPIO number to board pin object"""
-        pin_map = {
-            8: board.CE0,   # Default SPI CS0
-            7: board.CE1,   # SPI CS1
-            24: board.D24,  # GPIO 24
-            25: board.D25,  # GPIO 25
-            23: board.D23,  # GPIO 23
-            22: board.D22,  # GPIO 22
-            18: board.D18,  # GPIO 18
-            16: board.D16,  # GPIO 16
-            12: board.D12,  # GPIO 12
-            6: board.D6,    # GPIO 6
-            5: board.D5,    # GPIO 5
-            13: board.D13,  # GPIO 13
-            19: board.D19,  # GPIO 19
-            26: board.D26,  # GPIO 26
-            21: board.D21,  # GPIO 21
-            20: board.D20,  # GPIO 20
-        }
-        return pin_map.get(gpio_num, getattr(board, f'D{gpio_num}', None))
-
-    cs = digitalio.DigitalInOut(get_board_pin(CS_PIN))
-    dc = digitalio.DigitalInOut(get_board_pin(DC_PIN))
-    reset = digitalio.DigitalInOut(get_board_pin(RESET_PIN))
-    print(f"✓ Control pins configured")
-except Exception as e:
-    print(f"✗ Failed to configure pins: {e}")
-    print(f"  Make sure GPIO pins {CS_PIN}, {DC_PIN}, {RESET_PIN} are valid")
+    print(f"✗ Failed to initialize I2C: {e}")
     sys.exit(1)
 
 print()
-print("Attempting to initialize SPI display...")
+print("Scanning for display at I2C addresses...")
 
-try:
-    display = adafruit_ssd1306.SSD1306_SPI(
-        DISPLAY_WIDTH, DISPLAY_HEIGHT, spi, dc, reset, cs, baudrate=8000000
-    )
-    print(f"✓ DISPLAY FOUND!")
+# Convert hex string to int
+addr = int(I2C_ADDRESS, 16) if isinstance(I2C_ADDRESS, str) else I2C_ADDRESS
+
+# Try common I2C addresses
+addresses_to_try = [addr]
+if addr not in [0x3C, 0x3D]:
+    addresses_to_try.extend([0x3C, 0x3D])
+
+display_found = False
+
+for addr in addresses_to_try:
+    try:
+        print(f"  Trying address 0x{addr:02X}...", end=" ")
+        display = adafruit_ssd1306.SSD1306_I2C(DISPLAY_WIDTH, DISPLAY_HEIGHT, i2c, addr=addr)
+        print(f"✓ DISPLAY FOUND!")
     
-    # Test the display
-    print(f"  Testing display...")
-    display.fill(0)
-    display.show()
-    print(f"  ✓ Display cleared successfully")
-    
-    # Draw a test pattern
-    display.fill(1)
-    display.show()
-    print(f"  ✓ Display filled successfully")
-    
-    # Clear again
-    display.fill(0)
-    display.show()
-    print(f"  ✓ Display test complete")
-    
-    print()
-    print("SUCCESS: SPI OLED display is working!")
-    
-except Exception as e:
-    print(f"✗ Display initialization failed: {e}")
+        # Test the display
+        print(f"  Testing display...")
+        display.fill(0)
+        display.show()
+        print(f"  ✓ Display cleared successfully")
+        
+        # Draw a test pattern
+        display.fill(1)
+        display.show()
+        print(f"  ✓ Display filled successfully")
+        
+        # Clear again
+        display.fill(0)
+        display.show()
+        print(f"  ✓ Display test complete")
+        
+        display_found = True
+        print()
+        print(f"SUCCESS: I2C OLED display is working at address 0x{addr:02X}")
+        break
+        
+    except Exception as e:
+        print(f"✗ Not found - {e}")
+
+if not display_found:
     print()
     print("=" * 50)
     print("DISPLAY NOT FOUND")
@@ -136,20 +107,19 @@ except Exception as e:
     print("1. Check physical connections:")
     print("   - VCC to 3.3V or 5V")
     print("   - GND to Ground")
-    print(f"   - MOSI to GPIO 10 (Pin 19)")
-    print(f"   - SCLK to GPIO 11 (Pin 23)")
-    print(f"   - CS to GPIO {CS_PIN} (Pin based on your config)")
-    print(f"   - DC to GPIO {DC_PIN} (Pin based on your config)")
-    print(f"   - RST to GPIO {RESET_PIN} (Pin based on your config)")
+    print("   - SCL to GPIO3 (Pin 5)")
+    print("   - SDA to GPIO2 (Pin 3)")
     print()
-    print("2. Verify SPI is enabled:")
+    print("2. Verify I2C is enabled:")
     print("   sudo raspi-config")
-    print("   -> Interface Options -> SPI -> Enable")
+    print("   -> Interface Options -> I2C -> Enable")
     print("   -> Reboot")
     print()
-    print("3. Check SPI devices:")
-    print("   ls -la /dev/spi*")
+    print("3. Check if display appears on I2C bus:")
+    print("   sudo apt-get install -y i2c-tools")
+    print("   sudo i2cdetect -y 1")
     print()
-    print("4. Verify wiring with multimeter if available")
-    print("5. Try different display types (SSD1306, SH1106, etc.)")
+    print("4. Check I2C permissions:")
+    print("   sudo usermod -aG i2c $USER")
+    print("   (then logout and login again)")
     sys.exit(1)
